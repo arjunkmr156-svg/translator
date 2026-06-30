@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Instant Translator</title>
+<meta name="theme-color" content="#0b0e14" />
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0b0e14;
+    color: #f1f1f1;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+    padding-bottom: 40px;
+  }
+  h1 {
+    font-size: 1.3rem;
+    margin: 8px 0 16px;
+    background: linear-gradient(90deg, #f9d423, #fffd99);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-weight: 800;
+  }
+  .controls {
+    width: 100%;
+    max-width: 480px;
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .swap-btn {
+    padding: 10px 14px;
+    border: 1px solid #2a3142;
+    border-radius: 10px;
+    background: #1f2533;
+    color: #8a93a6;
+    cursor: pointer;
+    font-size: 1.2rem;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .swap-btn:hover:not(:disabled) {
+    background: #232a38;
+    border-color: #f9d423;
+    color: #f9d423;
+  }
+  .swap-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .panel {
+    width: 100%;
+    max-width: 480px;
+    background: #151a24;
+    border-radius: 18px;
+    padding: 16px;
+    margin-bottom: 14px;
+    border: 1px solid #232a38;
+    transition: all 0.2s;
+  }
+  .panel.active {
+    border-color: #f9d423;
+    box-shadow: 0 0 0 2px rgba(249,212,35,0.15);
+  }
+  select {
+    width: 100%;
+    background: #0b0e14;
+    color: #f1f1f1;
+    border: 1px solid #2a3142;
+    border-radius: 10px;
+    padding: 10px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  select:focus {
+    outline: none;
+    border-color: #f9d423;
+  }
+  select:hover {
+    border-color: #f9d423;
+  }
+  .label { 
+    font-size: 0.75rem; 
+    color: #8a93a6; 
+    margin-bottom: 6px; 
+    letter-spacing: 0.04em; 
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .lang-indicator {
+    font-size: 0.7rem;
+    color: #6b7280;
+  }
+  .mic-btn {
+    width: 100%;
+    margin-top: 12px;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    background: #1f2533;
+    color: #fff;
+    transition: 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+  .mic-btn:hover:not(:disabled) {
+    background: #232a38;
+  }
+  .mic-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .mic-btn.listening {
+    background: #d94343;
+    animation: pulse 1.1s infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(217,67,67,0.5); }
+    70% { box-shadow: 0 0 0 14px rgba(217,67,67,0); }
+    100% { box-shadow: 0 0 0 0 rgba(217,67,67,0); }
+  }
+  .text-block { margin-top: 12px; min-height: 50px; }
+  .original { color: #c8cdd8; font-size: 0.95rem; line-height: 1.4; word-wrap: break-word; }
+  .translated { color: #f9d423; font-size: 1.15rem; font-weight: 600; margin-top: 6px; line-height: 1.4; word-wrap: break-word; }
+  .status { 
+    font-size: 0.78rem; 
+    color: #6b7280; 
+    text-align: center; 
+    min-height: 18px; 
+    margin-top: 4px;
+    transition: color 0.15s;
+  }
+  .status.error {
+    color: #ef4444;
+  }
+  .status.success {
+    color: #10b981;
+  }
+  .swap-icon { 
+    text-align: center; 
+    color: #6b7280; 
+    font-size: 1.4rem; 
+    margin: -6px 0; 
+    user-select: none;
+  }
+  .footer-note { 
+    font-size: 0.72rem; 
+    color: #555c6b; 
+    text-align: center; 
+    max-width: 480px; 
+    margin-top: 6px; 
+    line-height: 1.4; 
+  }
+  .cache-indicator {
+    font-size: 0.7rem;
+    color: #8a93a6;
+    margin-top: 4px;
+    opacity: 0.7;
+  }
+  .network-status {
+    width: 100%;
+    max-width: 480px;
+    padding: 10px;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 0.85rem;
+    margin-bottom: 12px;
+    display: none;
+  }
+  .network-status.offline {
+    display: block;
+    background: #7f1d1d;
+    color: #fecaca;
+    border: 1px solid #dc2626;
+  }
+  .network-status.slow {
+    display: block;
+    background: #78350f;
+    color: #fed7aa;
+    border: 1px solid #f59e0b;
+  }
+</style>
+</head>
+<body>
+
+<h1>⚡ Instant Translator</h1>
+
+<div class="network-status" id="networkStatus" role="alert"></div>
+
+<div class="controls">
+  <button class="swap-btn" id="swapBtn" title="Swap languages and speakers" aria-label="Swap languages between Speaker A and Speaker B">⇅</button>
+</div>
+
+<div class="panel" id="panelA">
+  <div class="label">
+    <span>Speaker A</span>
+    <span class="lang-indicator" id="langIndicatorA">EN</span>
+  </div>
+  <select id="langA" aria-label="Select language for Speaker A"></select>
+  <button class="mic-btn" id="btnA" aria-label="Tap to speak for Speaker A">🎤 Tap to Speak</button>
+  <div class="text-block">
+    <div class="original" id="origA" aria-live="polite" aria-label="Your speech from Speaker A"></div>
+    <div class="translated" id="transA" aria-live="polite" aria-label="Translation for Speaker B"></div>
+    <div class="cache-indicator" id="cacheA"></div>
+  </div>
+</div>
+
+<div class="swap-icon">⇅</div>
+
+<div class="panel" id="panelB">
+  <div class="label">
+    <span>Speaker B</span>
+    <span class="lang-indicator" id="langIndicatorB">HI</span>
+  </div>
+  <select id="langB" aria-label="Select language for Speaker B"></select>
+  <button class="mic-btn" id="btnB" aria-label="Tap to speak for Speaker B">🎤 Tap to Speak</button>
+  <div class="text-block">
+    <div class="original" id="origB" aria-live="polite" aria-label="Your speech from Speaker B"></div>
+    <div class="translated" id="transB" aria-live="polite" aria-label="Translation for Speaker A"></div>
+    <div class="cache-indicator" id="cacheB"></div>
+  </div>
+</div>
+
+<div class="status" id="status" role="status" aria-live="polite">Pick languages, then tap a mic to talk</div>
+<div class="footer-note">Speech recognition needs internet. Translation by Google Translate. Uses local cache for recent translations.</div>
+
+<script>
+const LANGS = [
+  ["en-US","English","en"],["hi-IN","Hindi","hi"],["ar-SA","Arabic","ar"],["zh-CN","Chinese (Mandarin)","zh-CN"],
+  ["es-ES","Spanish","es"],["fr-FR","French","fr"],["ja-JP","Japanese","ja"],["de-DE","German","de"],
+  ["pt-BR","Portuguese","pt"],["ru-RU","Russian","ru"],["ko-KR","Korean","ko"],["it-IT","Italian","it"],
+  ["bn-IN","Bengali","bn"],["ur-PK","Urdu","ur"],["tr-TR","Turkish","tr"],["vi-VN","Vietnamese","vi"],
+  ["th-TH","Thai","th"],["id-ID","Indonesian","id"],["nl-NL","Dutch","nl"],["pl-PL","Polish","pl"],
+  ["ta-IN","Tamil","ta"],["te-IN","Telugu","te"],["mr-IN","Marathi","mr"],["gu-IN","Gujarati","gu"],
+  ["kn-IN","Kannada","kn"],["ml-IN","Malayalam","ml"],["pa-IN","Punjabi","pa"],["or-IN","Odia","or"],
+  ["as-IN","Assamese","as"],["sd-IN","Sindhi","sd"],["ne-NP","Nepali","ne"],
+  ["sa-IN","Sanskrit","sa"],["kok-IN","Konkani","gom"],["mai-IN","Maithili","mai"],["bho-IN","Bhojpuri","bho"]
+];
+
+// ===== CACHE SYSTEM =====
+class TranslationCache {
+  constructor(maxSize = 100) {
+    this.maxSize = maxSize;
+    this.load();
+  }
+  
+  load() {
+    try {
+      const stored = localStorage.getItem('translationCache');
+      this.cache = stored ? JSON.parse(stored) : {};
+    } catch {
+      this.cache = {};
+    }
+  }
+  
+  save() {
+    try {
+      localStorage.setItem('translationCache', JSON.stringify(this.cache));
+    } catch {
+      console.warn('Cache storage full');
+    }
+  }
+  
+  getKey(text, from, to) {
+    return `${from}:${to}:${text}`;
+  }
+  
+  get(text, from, to) {
+    const key = this.getKey(text, from, to);
+    return this.cache[key];
+  }
+  
+  set(text, from, to, translation) {
+    const key = this.getKey(text, from, to);
+    this.cache[key] = translation;
+    
+    if (Object.keys(this.cache).length > this.maxSize) {
+      const firstKey = Object.keys(this.cache)[0];
+      delete this.cache[firstKey];
+    }
+    
+    this.save();
+  }
+  
+  clear() {
+    this.cache = {};
+    try {
+      localStorage.removeItem('translationCache');
+    } catch {}
+  }
+}
+
+const cache = new TranslationCache();
+
+// ===== NETWORK DETECTION =====
+class NetworkMonitor {
+  constructor() {
+    this.online = navigator.onLine;
+    this.setupListeners();
+  }
+  
+  setupListeners() {
+    window.addEventListener('online', () => {
+      this.online = true;
+      this.updateStatus();
+    });
+    window.addEventListener('offline', () => {
+      this.online = false;
+      this.updateStatus();
+    });
+  }
+  
+  updateStatus() {
+    const el = document.getElementById('networkStatus');
+    if (!this.online) {
+      el.textContent = '🔴 You are offline. Using cached translations.';
+      el.className = 'network-status offline';
+    } else {
+      el.textContent = '';
+      el.className = 'network-status';
+    }
+  }
+  
+  isOnline() {
+    return this.online;
+  }
+}
+
+const networkMonitor = new NetworkMonitor();
+networkMonitor.updateStatus();
+
+// ===== LANGUAGE SETUP =====
+function fillSelect(sel, defaultCode) {
+  LANGS.forEach(([code, name]) => {
+    const opt = document.createElement("option");
+    opt.value = code;
+    opt.textContent = name;
+    if (code === defaultCode) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+const langA = document.getElementById("langA");
+const langB = document.getElementById("langB");
+const swapBtn = document.getElementById("swapBtn");
+fillSelect(langA, "en-US");
+fillSelect(langB, "hi-IN");
+
+function updateLangIndicators() {
+  const indicA = document.getElementById("langIndicatorA");
+  const indicB = document.getElementById("langIndicatorB");
+  const codeA = getShortCode(langA.value);
+  const codeB = getShortCode(langB.value);
+  indicA.textContent = codeA.toUpperCase();
+  indicB.textContent = codeB.toUpperCase();
+}
+
+langA.addEventListener('change', updateLangIndicators);
+langB.addEventListener('change', updateLangIndicators);
+updateLangIndicators();
+
+// Swap languages and speakers
+swapBtn.addEventListener('click', () => {
+  const tempVal = langA.value;
+  langA.value = langB.value;
+  langB.value = tempVal;
+  
+  const tempOrig = document.getElementById("origA").textContent;
+  const tempTrans = document.getElementById("transA").textContent;
+  document.getElementById("origA").textContent = document.getElementById("origB").textContent;
+  document.getElementById("transA").textContent = document.getElementById("transB").textContent;
+  document.getElementById("origB").textContent = tempOrig;
+  document.getElementById("transB").textContent = tempTrans;
+  
+  updateLangIndicators();
+});
+
+const statusEl = document.getElementById("status");
+
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (!SpeechRecognition) {
+  statusEl.textContent = "⚠️ Speech recognition not supported. Use Chrome, Edge, or Safari.";
+  statusEl.className = 'status error';
+  document.getElementById('btnA').disabled = true;
+  document.getElementById('btnB').disabled = true;
+}
+
+function getShortCode(speechCode) {
+  const entry = LANGS.find(l => l[0] === speechCode);
+  return entry ? entry[2] : "en";
+}
+
+// ===== TRANSLATION WITH RETRY & CACHE =====
+async function translateText(text, fromCode, toCode, retries = 3) {
+  // Check cache first
+  const cached = cache.get(text, fromCode, toCode);
+  if (cached) {
+    return { text: cached, fromCache: true };
+  }
+  
+  if (!networkMonitor.isOnline()) {
+    throw new Error('No internet connection. Try a cached translation or wait for connection.');
+  }
+  
+  let lastError;
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${fromCode}&tl=${toCode}&dt=t&q=${encodeURIComponent(text)}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      
+      const data = await res.json();
+      const translated = data[0].map(seg => seg[0]).join("");
+      
+      // Cache successful translation
+      cache.set(text, fromCode, toCode, translated);
+      
+      return { text: translated, fromCache: false };
+    } catch (err) {
+      lastError = err;
+      if (attempt < retries - 1) {
+        await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+      }
+    }
+  }
+  
+  throw lastError || new Error('Translation failed');
+}
+
+function setupSpeaker(btnId, origId, transId, srcLangSel, dstLangSel, panelId, cacheId) {
+  const btn = document.getElementById(btnId);
+  const origEl = document.getElementById(origId);
+  const transEl = document.getElementById(transId);
+  const panel = document.getElementById(panelId);
+  const cacheEl = document.getElementById(cacheId);
+
+  if (!SpeechRecognition) {
+    btn.disabled = true;
+    return;
+  }
+
+  let recognition = null;
+  let listening = false;
+  let currentUtterance = null;
+
+  btn.addEventListener("click", () => {
+    if (listening) {
+      recognition && recognition.stop();
+      if (currentUtterance) {
+        speechSynthesis.cancel();
+      }
+      return;
+    }
+
+    recognition = new SpeechRecognition();
+    recognition.lang = srcLangSel.value;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    listening = true;
+    btn.classList.add("listening");
+    btn.textContent = "🔴 Listening...";
+    panel.classList.add("active");
+    statusEl.textContent = "🎤 Listening for speech...";
+    statusEl.className = 'status';
+    cacheEl.textContent = '';
+
+    recognition.start();
+
+    recognition.onresult = async (event) => {
+      const text = event.results[0][0].transcript;
+      origEl.textContent = text;
+      transEl.textContent = "";
+      statusEl.textContent = "⏳ Translating...";
+      statusEl.className = 'status';
+
+      const fromCode = getShortCode(srcLangSel.value);
+      const toCode = getShortCode(dstLangSel.value);
+
+      try {
+        const result = await translateText(text, fromCode, toCode);
+        transEl.textContent = result.text;
+        
+        if (result.fromCache) {
+          cacheEl.textContent = '📦 From cache';
+          statusEl.textContent = "📦 Using cached translation...";
+        } else {
+          cacheEl.textContent = '';
+          statusEl.textContent = "🔊 Speaking translation...";
+        }
+        statusEl.className = 'status success';
+
+        const utter = new SpeechSynthesisUtterance(result.text);
+        utter.lang = dstLangSel.value;
+        utter.rate = 0.95;
+        utter.onend = () => { 
+          statusEl.textContent = "✅ Done. Tap a mic to talk again.";
+          statusEl.className = 'status success';
+        };
+        utter.onerror = () => {
+          statusEl.textContent = "⚠️ Speech synthesis error.";
+          statusEl.className = 'status error';
+        };
+        currentUtterance = utter;
+        speechSynthesis.speak(utter);
+      } catch (err) {
+        statusEl.textContent = "❌ " + err.message;
+        statusEl.className = 'status error';
+        console.error(err);
+      }
+    };
+
+    recognition.onerror = (e) => {
+      let errMsg = e.error;
+      if (e.error === 'no-speech') errMsg = 'No speech detected. Try again.';
+      else if (e.error === 'network') errMsg = 'Network error. Check your connection.';
+      
+      statusEl.textContent = "❌ Mic error: " + errMsg;
+      statusEl.className = 'status error';
+    };
+
+    recognition.onend = () => {
+      listening = false;
+      btn.classList.remove("listening");
+      btn.textContent = "🎤 Tap to Speak";
+      panel.classList.remove("active");
+    };
+  });
+}
+
+setupSpeaker("btnA", "origA", "transA", langA, langB, "panelA", "cacheA");
+setupSpeaker("btnB", "origB", "transB", langB, langA, "panelB", "cacheB");
+</script>
+
+</body>
+</html>
